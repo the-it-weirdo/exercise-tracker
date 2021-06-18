@@ -4,22 +4,21 @@ const { Schema } = mongoose;
 
 const exerciseSchema = new Schema(
     {
+      user_id : String,
       description : {type: String, required: true },
       duration : {type: Number, required: true },
-      date : Date
+      dateObj : Date,
+      date : String
     }
 );
 
 const userSchema = new Schema(
   {
     username : {type: String, required: true },
-    exercises : [exerciseSchema]
   }
 );
 
-
-
-mongoose.connect(process.env.DB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+mongoose.connect(process.env['DB_URI'], { useNewUrlParser: true, useUnifiedTopology: true });
 
 const User = mongoose.model('User', userSchema);
 const Exercise = mongoose.model('Exercise', exerciseSchema);
@@ -27,7 +26,7 @@ const Exercise = mongoose.model('Exercise', exerciseSchema);
 // Functions
 
 const createAndSaveUser = (userName, done) => {
-    var userDocument = new User({userName});
+    var userDocument = new User({'username':userName});
 
     userDocument.save(function (err, savedUser){
         if (err) return console.log(err);
@@ -37,16 +36,17 @@ const createAndSaveUser = (userName, done) => {
 
 
 const addExercise = (userId, exercise, done) => {
+
     User.findById(userId, function(err, user) {
         if (err) return console.log(err);
         
-        user.exercises.push(exercise);
+        exercise.user_id = userId;
 
-        user.save(function (err, updatedUser) {
-            if (err) return console.log(err);
+        exercise.save(function(err, savedExercise){
+          if (err) return console.log(err);
 
-            done(null, {_id : updatedUser._id, userName : updatedUser.username, ...exercise});
-        })
+          done(null, {_id : user._id, username : user.username, description: savedExercise.description, duration: savedExercise.duration, date: savedExercise.date});
+        });
     });    
 };
 
@@ -57,55 +57,44 @@ const findAllUsers = (done) => {
     });
 };
 
-const findAllExercises = (userId, done) => {
-    User.findById(userId, function (err, user) {
-        if (err) return console.log(err);
-
-        done(null, {
-            _id : user._id,
-            username: user.username,
-            count: user.exercises.length,
-            log: user.exercises
-        });
-    });
-};
 
 const findExercises = (userId, fromDate, toDate, limit, done) => {
-    if (!fromDate && !toDate && !limit) {
-        findAllExercises(userId, done);
-    } else {
-
-        let findOption = { _id: userId };
+        let findOption = { user_id: userId };
         
         if (fromDate || toDate) {
-            findOption['date'] = {};
+            findOption['dateObj'] = {};
         } 
 
         if (fromDate) {
-            findOption['date']['$gte'] = fromDate;
+            findOption['dateObj']['$gte'] = fromDate;
         }
 
         if (toDate) {
-            findOption['date']['$lt'] = toDate;
+            findOption['dateObj']['$lt'] = toDate;
         }
 
-        const query = User.find( findOption );
+        const query = Exercise.find( findOption );
 
         if (limit) {
-            query.limit(limit);
+            query.limit(parseInt(limit));
         }
 
-        query.exec(function (err, user) {
+        query.select({_id:0, user_id: 0, __v: 0, dateObj: 0});
+
+        query.exec(function (err, exercises) {
             if (err) return console.log(err);
 
-            done(null, {
-                _id : user._id,
-                username: user.username,
-                count: user.exercises.length,
-                log: user.exercises
+            User.findById(userId, function(err, user){
+              if (err) return console.log(err);
+
+              done(null, {
+                  _id : user._id,
+                  username: user.username,
+                  count: exercises.length,
+                  log: exercises
+              });
             });
         });
-    }
 };
 
 // Exports

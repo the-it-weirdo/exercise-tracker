@@ -34,10 +34,12 @@ app.route('/api/users')
 
 
 app.post('/api/users/:_id/exercises', function(req, res) {
+  const eDate = req.body.date ? new Date(req.body.date) : new Date();
   const exercise = new Exercise({
       description: req.body.description,
       duration: req.body.duration,
-      date: req.body.date || new Date()
+      dateObj: eDate,
+      date: eDate.toDateString()
   });
   addExercise(req.params._id, exercise, function(err, savedData) {
     if (err) return console.log(err);
@@ -49,11 +51,11 @@ app.get('/api/users/:_id/logs', function (req, res) {
   const userId = req.params._id;
   const fromDate = req.query.from ? new Date(req.query.from) : undefined;
   const toDate = req.query.to ? new Date(req.query.to) : undefined;
-  const limit = req.query.params;
+  const limit = req.query.limit;
 
   findExercises(userId, fromDate, toDate, limit, function(err, data) {
     if (err) return console.log(err);
-
+    
     res.json(data);
   });
 });
